@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Календарь — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .calendar-header { display:flex; align-items:center; gap:16px; margin-bottom:24px; }
+        .calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+        .calendar-day-name { text-align:center; font-size:12px; color:#999; font-weight:600; padding:8px 0; }
+        .calendar-day {
+            background:white; border-radius:8px; min-height:90px; padding:8px;
+            border:1px solid #eee; cursor:pointer; transition:border-color 0.2s;
+        }
+        .calendar-day:hover { border-color:#7C6FF7; }
+        .calendar-day.today { border-color:#7C6FF7; background:#f5f3ff; }
+        .calendar-day.other-month { opacity:0.4; }
+        .day-number { font-size:13px; font-weight:600; margin-bottom:4px; }
+        .day-booking {
+            font-size:11px; background:#7C6FF7; color:white;
+            border-radius:4px; padding:2px 5px; margin-bottom:2px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        .day-booking.confirmed { background:#22c55e; }
+        .day-booking.cancelled { background:#ef4444; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link active">📅 Календарь</a>
+            <a href="/bookings" class="nav-link">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link">💼 Услуги</a>
+            <a href="/schedule" class="nav-link">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="calendar-header">
+            <button class="btn btn-outline" onclick="changeMonth(-1)">←</button>
+            <h1 id="month-title" style="font-size:22px;font-weight:700"></h1>
+            <button class="btn btn-outline" onclick="changeMonth(1)">→</button>
+            <button class="btn btn-outline" onclick="goToday()">Сегодня</button>
+        </div>
+
+        <div class="calendar-grid" id="calendar-names"></div>
+        <div class="calendar-grid" id="calendar-grid" style="margin-top:8px"></div>
+    </main>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+let currentDate = new Date();
+let allBookings = [];
+let clientMap = {};
+
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+async function loadData() {
+    try {
+        const [bookings, clients] = await Promise.all([
+            api('GET', '/bookings'),
+            api('GET', '/clients'),
+        ]);
+        allBookings = bookings;
+        clients.forEach(c => clientMap[c.id] = c.name);
+        renderCalendar();
+    } catch(e) { console.error(e); }
+}
+
+function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('month-title').textContent = `${MONTHS[month]} ${year}`;
+
+    // Заголовки дней
+    document.getElementById('calendar-names').innerHTML = DAYS.map(d =>
+        `<div class="calendar-day-name">${d}</div>`
+    ).join('');
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    // Смещение: понедельник = 0
+    let startOffset = firstDay.getDay() - 1;
+    if (startOffset < 0) startOffset = 6;
+
+    const today = new Date().toISOString().split('T')[0];
+    const cells = [];
+
+    // Дни предыдущего месяца
+    for (let i = startOffset - 1; i >= 0; i--) {
+        const d = new Date(year, month, -i);
+        cells.push({ date: d, otherMonth: true });
+    }
+    // Дни текущего месяца
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+        cells.push({ date: new Date(year, month, d), otherMonth: false });
+    }
+    // Дни следующего месяца
+    const remaining = 42 - cells.length;
+    for (let d = 1; d <= remaining; d++) {
+        cells.push({ date: new Date(year, month + 1, d), otherMonth: true });
+    }
+
+    document.getElementById('calendar-grid').innerHTML = cells.map(cell => {
+        const dateStr = cell.date.toISOString().split('T')[0];
+        const dayBookings = allBookings.filter(b => b.date === dateStr);
+        const isToday = dateStr === today;
+
+        const bookingHtml = dayBookings.slice(0, 3).map(b =>
+            `<div class="day-booking ${b.status}" title="${clientMap[b.client_id] || '—'} ${b.time}">
+                ${b.time} ${clientMap[b.client_id] || '—'}
+            </div>`
+        ).join('');
+
+        return `<div class="calendar-day ${isToday ? 'today' : ''} ${cell.otherMonth ? 'other-month' : ''}"
+                    onclick="window.location='/bookings'">
+            <div class="day-number">${cell.date.getDate()}</div>
+            ${bookingHtml}
+            ${dayBookings.length > 3 ? `<div style="font-size:11px;color:#999">+${dayBookings.length - 3} ещё</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function changeMonth(dir) {
+    currentDate.setMonth(currentDate.getMonth() + dir);
+    renderCalendar();
+}
+
+function goToday() {
+    currentDate = new Date();
+    renderCalendar();
+}
+
+loadData();
+</script>
+</body>
+</html>

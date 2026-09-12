@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Дашборд — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link">📅 Календарь</a>
+            <a href="/bookings" class="nav-link">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link">💼 Услуги</a>
+            <a href="/schedule" class="nav-link">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="page-header">
+            <h1>Дашборд</h1>
+        </div>
+
+        <div class="cards-grid" id="stats"></div>
+
+        <div class="section">
+            <h2>Ближайшие записи</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Клиент</th>
+                            <th>Дата</th>
+                            <th>Время</th>
+                            <th>Услуга</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookings-list">
+                        <tr><td colspan="5" style="text-align:center;color:#999">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+async function loadDashboard() {
+    try {
+        const [clients, bookings] = await Promise.all([
+            api('GET', '/clients'),
+            api('GET', '/bookings'),
+        ]);
+
+        const today = new Date().toISOString().split('T')[0];
+        const todayBookings = bookings.filter(b => b.date === today);
+        const upcoming = bookings.filter(b => b.date >= today && b.status !== 'cancelled');
+
+        document.getElementById('stats').innerHTML = `
+            <div class="card">
+                <div class="card-value">${clients.length}</div>
+                <div class="card-label">Всего клиентов</div>
+            </div>
+            <div class="card">
+                <div class="card-value">${todayBookings.length}</div>
+                <div class="card-label">Записей сегодня</div>
+            </div>
+            <div class="card">
+                <div class="card-value">${upcoming.length}</div>
+                <div class="card-label">Предстоящих записей</div>
+            </div>
+        `;
+
+        const clientMap = {};
+        clients.forEach(c => clientMap[c.id] = c.name);
+
+        const rows = upcoming.slice(0, 10).map(b => `
+            <tr>
+                <td>${clientMap[b.client_id] || '—'}</td>
+                <td>${b.date}</td>
+                <td>${b.time}</td>
+                <td>—</td>
+                <td>${statusBadge(b.status)}</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('bookings-list').innerHTML = rows || 
+            '<tr><td colspan="5" style="text-align:center;color:#999">Нет предстоящих записей</td></tr>';
+
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

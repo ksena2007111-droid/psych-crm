@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Услуги — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link">📅 Календарь</a>
+            <a href="/bookings" class="nav-link">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link active">💼 Услуги</a>
+            <a href="/schedule" class="nav-link">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="page-header">
+            <h1>Услуги</h1>
+            <button class="btn btn-primary" onclick="openModal('modal-add-service')">+ Добавить услугу</button>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Длительность</th>
+                        <th>Стоимость</th>
+                        <th>Формат</th>
+                        <th>Доступность</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="services-list">
+                    <tr><td colspan="6" style="text-align:center;color:#999">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Модалка добавления -->
+<div class="modal-overlay" id="modal-add-service">
+    <div class="modal">
+        <h2>Добавить услугу</h2>
+        <div class="form-group">
+            <label>Название *</label>
+            <input type="text" id="s-name" placeholder="Индивидуальная консультация">
+        </div>
+        <div class="form-group">
+            <label>Описание</label>
+            <textarea id="s-description" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Длительность (мин) *</label>
+            <input type="number" id="s-duration" placeholder="60">
+        </div>
+        <div class="form-group">
+            <label>Стоимость *</label>
+            <input type="number" id="s-price" placeholder="100">
+        </div>
+        <div class="form-group">
+            <label>Формат</label>
+            <select id="s-format">
+                <option value="online">Онлайн</option>
+                <option value="offline">Офлайн</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-add-service')">Отмена</button>
+            <button class="btn btn-primary" onclick="addService()">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка редактирования -->
+<div class="modal-overlay" id="modal-edit-service">
+    <div class="modal">
+        <h2>Редактировать услугу</h2>
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+            <label>Название *</label>
+            <input type="text" id="edit-name">
+        </div>
+        <div class="form-group">
+            <label>Описание</label>
+            <textarea id="edit-description" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Длительность (мин) *</label>
+            <input type="number" id="edit-duration">
+        </div>
+        <div class="form-group">
+            <label>Стоимость *</label>
+            <input type="number" id="edit-price">
+        </div>
+        <div class="form-group">
+            <label>Формат</label>
+            <select id="edit-format">
+                <option value="online">Онлайн</option>
+                <option value="offline">Офлайн</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-edit-service')">Отмена</button>
+            <button class="btn btn-primary" onclick="saveService()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+async function loadServices() {
+    try {
+        const services = await api('GET', '/services');
+        const tbody = document.getElementById('services-list');
+        if (!services.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999">Нет услуг</td></tr>';
+            return;
+        }
+        tbody.innerHTML = services.map(s => `
+            <tr>
+                <td><strong>${s.name}</strong>${s.description ? `<br><small style="color:#999">${s.description}</small>` : ''}</td>
+                <td>${s.duration_minutes} мин</td>
+                <td>${s.price} BYN</td>
+                <td>${s.format === 'online' ? '🌐 Онлайн' : '🏢 Офлайн'}</td>
+                <td>
+                    <span class="badge ${s.is_available ? 'badge-confirmed' : 'badge-inactive'}">
+                        ${s.is_available ? 'Доступна' : 'Недоступна'}
+                    </span>
+                </td>
+                <td style="display:flex;gap:6px">
+                    <button class="btn btn-sm btn-outline" onclick="editService(${JSON.stringify(s).replace(/"/g, '&quot;')})">✏️</button>
+                    <button class="btn btn-sm ${s.is_available ? 'btn-danger' : 'btn-success'}" onclick="toggleService(${s.id})">
+                        ${s.is_available ? 'Откл' : 'Вкл'}
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteService(${s.id})">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function addService() {
+    const data = {
+        name: document.getElementById('s-name').value,
+        description: document.getElementById('s-description').value || null,
+        duration_minutes: parseInt(document.getElementById('s-duration').value),
+        price: parseFloat(document.getElementById('s-price').value),
+        format: document.getElementById('s-format').value,
+    };
+    if (!data.name || !data.duration_minutes || !data.price) {
+        alert('Заполните обязательные поля'); return;
+    }
+    try {
+        await api('POST', '/services', data);
+        closeModal('modal-add-service');
+        loadServices();
+    } catch(e) { alert(e.message); }
+}
+
+function editService(s) {
+    document.getElementById('edit-id').value = s.id;
+    document.getElementById('edit-name').value = s.name;
+    document.getElementById('edit-description').value = s.description || '';
+    document.getElementById('edit-duration').value = s.duration_minutes;
+    document.getElementById('edit-price').value = s.price;
+    document.getElementById('edit-format').value = s.format;
+    openModal('modal-edit-service');
+}
+
+async function saveService() {
+    const id = document.getElementById('edit-id').value;
+    const data = {
+        name: document.getElementById('edit-name').value,
+        description: document.getElementById('edit-description').value || null,
+        duration_minutes: parseInt(document.getElementById('edit-duration').value),
+        price: parseFloat(document.getElementById('edit-price').value),
+        format: document.getElementById('edit-format').value,
+    };
+    try {
+        await api('PUT', `/services/${id}`, data);
+        closeModal('modal-edit-service');
+        loadServices();
+    } catch(e) { alert(e.message); }
+}
+
+async function toggleService(id) {
+    try {
+        await api('PATCH', `/services/${id}/toggle`);
+        loadServices();
+    } catch(e) { alert(e.message); }
+}
+
+async function deleteService(id) {
+    if (!confirm('Удалить услугу?')) return;
+    try {
+        await api('DELETE', `/services/${id}`);
+        loadServices();
+    } catch(e) { alert(e.message); }
+}
+
+loadServices();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Карточка клиента — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link active">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link">📅 Календарь</a>
+            <a href="/bookings" class="nav-link">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link">💼 Услуги</a>
+            <a href="/schedule" class="nav-link">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <a href="/clients" style="color:#7C6FF7;text-decoration:none">← Назад</a>
+                <h1 id="client-name" style="margin-top:8px">Загрузка...</h1>
+            </div>
+            <button class="btn btn-primary" onclick="saveClient()">Сохранить</button>
+        </div>
+
+        <div class="section">
+            <h2>Личная информация</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group">
+                    <label>Имя</label>
+                    <input type="text" id="f-name">
+                </div>
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="text" id="f-phone">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="f-email">
+                </div>
+                <div class="form-group">
+                    <label>Дата рождения</label>
+                    <input type="date" id="f-birth-date" onchange="updateAge()">
+                </div>
+                <div class="form-group">
+                    <label>Возраст</label>
+                    <input type="text" id="f-age-display" disabled placeholder="Рассчитается автоматически">
+                </div>
+                <div class="form-group">
+                    <label>Пол</label>
+                    <select id="f-gender">
+                        <option value="">Не указан</option>
+                        <option value="female">Женский</option>
+                        <option value="male">Мужской</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Статус</label>
+                    <select id="f-status">
+                        <option value="active">Активен</option>
+                        <option value="inactive">Неактивен</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>План работы</label>
+                <textarea id="f-work-plan" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Заметки</label>
+                <textarea id="f-notes" rows="3"></textarea>
+            </div>
+        </div>
+
+        <div class="tabs" data-group="client">
+            <div class="tab active" data-group="client" data-target="tab-sessions">Сессии</div>
+        </div>
+
+        <div class="tab-content active" id="tab-sessions" data-group="client">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+                <button class="btn btn-primary" onclick="openModal('modal-add-session')">+ Добавить сессию</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Запрос</th>
+                            <th>Статус</th>
+                            <th>AI саммари</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessions-list">
+                        <tr><td colspan="5" style="text-align:center;color:#999">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Модалка добавления сессии -->
+<div class="modal-overlay" id="modal-add-session">
+    <div class="modal">
+        <h2>Добавить сессию</h2>
+        <div class="form-group">
+            <label>Дата *</label>
+            <input type="date" id="s-date">
+        </div>
+        <div class="form-group">
+            <label>Запрос клиента</label>
+            <textarea id="s-request" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Описание сессии</label>
+            <textarea id="s-description" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Рефлексия психолога</label>
+            <textarea id="s-reflection" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Домашнее задание</label>
+            <textarea id="s-homework" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Статус</label>
+            <select id="s-status">
+                <option value="planned">Запланирована</option>
+                <option value="done">Проведена</option>
+                <option value="cancelled">Отменена</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-add-session')">Отмена</button>
+            <button class="btn btn-primary" onclick="addSession()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка просмотра сессии -->
+<div class="modal-overlay" id="modal-view-session">
+    <div class="modal" style="width:600px">
+        <h2>Сессия</h2>
+        <div id="session-detail"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-view-session')">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+const clientId = {{ client_id }};
+let client = null;
+
+function calcAge(birthDate) {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+}
+
+function updateAge() {
+    const val = document.getElementById('f-birth-date').value;
+    document.getElementById('f-age-display').value = val ? calcAge(val) + ' лет' : '';
+}
+
+async function loadClient() {
+    try {
+        client = await api('GET', `/clients/${clientId}`);
+        document.getElementById('client-name').textContent = client.name;
+        document.getElementById('f-name').value = client.name || '';
+        document.getElementById('f-phone').value = client.phone || '';
+        document.getElementById('f-email').value = client.email || '';
+        document.getElementById('f-birth-date').value = client.birth_date || '';
+        document.getElementById('f-gender').value = client.gender || '';
+        document.getElementById('f-status').value = client.status || 'active';
+        document.getElementById('f-work-plan').value = client.work_plan || '';
+        document.getElementById('f-notes').value = client.notes || '';
+        updateAge();
+    } catch(e) { alert('Ошибка загрузки клиента'); }
+}
+
+async function saveClient() {
+    const data = {
+        name: document.getElementById('f-name').value,
+        phone: document.getElementById('f-phone').value || null,
+        email: document.getElementById('f-email').value || null,
+        birth_date: document.getElementById('f-birth-date').value || null,
+        gender: document.getElementById('f-gender').value || null,
+        status: document.getElementById('f-status').value,
+        work_plan: document.getElementById('f-work-plan').value || null,
+        notes: document.getElementById('f-notes').value || null,
+    };
+    try {
+        await api('PUT', `/clients/${clientId}`, data);
+        alert('Сохранено!');
+        document.getElementById('client-name').textContent = data.name;
+    } catch(e) { alert(e.message); }
+}
+
+async function loadSessions() {
+    try {
+        const sessions = await api('GET', `/clients/${clientId}/sessions`);
+        const tbody = document.getElementById('sessions-list');
+        if (!sessions.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999">Нет сессий</td></tr>';
+            return;
+        }
+        tbody.innerHTML = sessions.map(s => `
+            <tr style="cursor:pointer" onclick="viewSession(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                <td>${s.date}</td>
+                <td>${s.request || '—'}</td>
+                <td>${statusBadge(s.status)}</td>
+                <td>${s.ai_summary ? '✅ Есть' : '—'}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteSession(${s.id})">Удалить</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+function viewSession(s) {
+    document.getElementById('session-detail').innerHTML = `
+        <div class="form-group"><label>Дата</label><p>${s.date}</p></div>
+        <div class="form-group"><label>Запрос клиента</label><p>${s.request || '—'}</p></div>
+        <div class="form-group"><label>Описание</label><p>${s.description || '—'}</p></div>
+        <div class="form-group"><label>Рефлексия</label><p>${s.reflection || '—'}</p></div>
+        <div class="form-group"><label>Домашнее задание</label><p>${s.homework || '—'}</p></div>
+        <div class="form-group"><label>Статус</label><p>${statusBadge(s.status)}</p></div>
+        ${s.ai_summary ? `
+        <div class="form-group">
+            <label>📝 AI Саммари</label>
+            <p style="background:#f8f8ff;padding:12px;border-radius:8px">${s.ai_summary}</p>
+        </div>
+        <div class="form-group">
+            <label>💡 Рекомендации</label>
+            <p style="background:#f8f8ff;padding:12px;border-radius:8px">${s.ai_recommendations}</p>
+        </div>` : ''}
+    `;
+    openModal('modal-view-session');
+}
+
+async function addSession() {
+    const data = {
+        date: document.getElementById('s-date').value,
+        request: document.getElementById('s-request').value || null,
+        description: document.getElementById('s-description').value || null,
+        reflection: document.getElementById('s-reflection').value || null,
+        homework: document.getElementById('s-homework').value || null,
+        status: document.getElementById('s-status').value,
+    };
+    if (!data.date) { alert('Укажите дату'); return; }
+    try {
+        await api('POST', `/clients/${clientId}/sessions`, data);
+        closeModal('modal-add-session');
+        loadSessions();
+    } catch(e) { alert(e.message); }
+}
+
+async function deleteSession(id) {
+    if (!confirm('Удалить сессию?')) return;
+    try {
+        await api('DELETE', `/sessions/${id}`);
+        loadSessions();
+    } catch(e) { alert(e.message); }
+}
+
+loadClient();
+loadSessions();
+</script>
+</body>
+</html>

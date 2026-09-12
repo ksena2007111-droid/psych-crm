@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Вход — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="login-page">
+    <div class="login-box">
+        <h1>🧠 PsychCRM</h1>
+        <p>Система управления для психолога</p>
+
+        <div class="login-tabs">
+            <div class="login-tab active" onclick="showTab('login')">Вход</div>
+            <div class="login-tab" onclick="showTab('register')">Регистрация</div>
+        </div>
+
+        <div id="alert" class="alert alert-error" style="display:none"></div>
+
+        <!-- Форма входа -->
+        <div id="tab-login">
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="psychologist@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="login-password" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Войти</button>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div id="tab-register" style="display:none">
+            <div class="form-group">
+                <label>Имя</label>
+                <input type="text" id="reg-name" placeholder="Анна Иванова">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="reg-email" placeholder="psychologist@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="reg-password" placeholder="••••••••">
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="doRegister()">Зарегистрироваться</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showTab(tab) {
+    document.getElementById('tab-login').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('tab-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.querySelectorAll('.login-tab').forEach((t, i) => {
+        t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+    document.getElementById('alert').style.display = 'none';
+}
+
+function showAlert(msg) {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+async function doLogin() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+        });
+        if (!res.ok) { showAlert('Неверный email или пароль'); return; }
+        const data = await res.json();
+        document.cookie = `token=${data.access_token}; path=/; max-age=${60*60*24*7}`;
+        window.location.href = '/dashboard';
+    } catch(e) { showAlert('Ошибка подключения'); }
+}
+
+async function doRegister() {
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            showAlert(err.detail || 'Ошибка регистрации');
+            return;
+        }
+        showAlert('Успешно! Теперь войдите.');
+        showTab('login');
+    } catch(e) { showAlert('Ошибка подключения'); }
+}
+</script>
+</body>
+</html>

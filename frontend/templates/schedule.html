@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Расписание — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link">📅 Календарь</a>
+            <a href="/bookings" class="nav-link">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link">💼 Услуги</a>
+            <a href="/schedule" class="nav-link active">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="page-header">
+            <h1>Расписание</h1>
+            <button class="btn btn-primary" onclick="openModal('modal-add-schedule')">+ Создать расписание</button>
+        </div>
+
+        <div id="schedules-list"></div>
+    </main>
+</div>
+
+<!-- Модалка создания расписания -->
+<div class="modal-overlay" id="modal-add-schedule">
+    <div class="modal">
+        <h2>Создать расписание</h2>
+        <div class="form-group">
+            <label>Название</label>
+            <input type="text" id="sch-name" placeholder="Основное расписание">
+        </div>
+        <div class="form-group">
+            <label>Рабочие дни</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <label><input type="checkbox" value="mon"> Пн</label>
+                <label><input type="checkbox" value="tue"> Вт</label>
+                <label><input type="checkbox" value="wed"> Ср</label>
+                <label><input type="checkbox" value="thu"> Чт</label>
+                <label><input type="checkbox" value="fri"> Пт</label>
+                <label><input type="checkbox" value="sat"> Сб</label>
+                <label><input type="checkbox" value="sun"> Вс</label>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+                <label>Начало работы</label>
+                <input type="time" id="sch-start" value="09:00">
+            </div>
+            <div class="form-group">
+                <label>Конец работы</label>
+                <input type="time" id="sch-end" value="18:00">
+            </div>
+            <div class="form-group">
+                <label>Начало перерыва</label>
+                <input type="time" id="sch-break-start">
+            </div>
+            <div class="form-group">
+                <label>Конец перерыва</label>
+                <input type="time" id="sch-break-end">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Длительность слота (мин)</label>
+            <input type="number" id="sch-slot" value="60">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-add-schedule')">Отмена</button>
+            <button class="btn btn-primary" onclick="addSchedule()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка исключений -->
+<div class="modal-overlay" id="modal-exception">
+    <div class="modal">
+        <h2>Добавить выходной день</h2>
+        <input type="hidden" id="exc-schedule-id">
+        <div class="form-group">
+            <label>Дата</label>
+            <input type="date" id="exc-date">
+        </div>
+        <div class="form-group">
+            <label>Причина</label>
+            <input type="text" id="exc-reason" placeholder="Отпуск, болезнь...">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('modal-exception')">Отмена</button>
+            <button class="btn btn-primary" onclick="addException()">Добавить</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+const DAY_LABELS = { mon:'Пн', tue:'Вт', wed:'Ср', thu:'Чт', fri:'Пт', sat:'Сб', sun:'Вс' };
+
+async function loadSchedules() {
+    try {
+        const schedules = await api('GET', '/schedule');
+        const container = document.getElementById('schedules-list');
+        if (!schedules.length) {
+            container.innerHTML = '<div class="section" style="text-align:center;color:#999">Нет расписаний</div>';
+            return;
+        }
+        container.innerHTML = schedules.map(s => `
+            <div class="section" style="margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <div>
+                        <strong style="font-size:16px">${s.name}</strong>
+                        ${s.is_active ? '<span class="badge badge-confirmed" style="margin-left:8px">Активное</span>' : ''}
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        ${!s.is_active ? `<button class="btn btn-sm btn-success" onclick="activateSchedule(${s.id})">Сделать активным</button>` : ''}
+                        <button class="btn btn-sm btn-outline" onclick="openException(${s.id})">+ Выходной</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${s.id})">🗑️</button>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;font-size:14px">
+                    <div><span style="color:#999">Дни:</span> ${s.work_days.map(d => DAY_LABELS[d]).join(', ')}</div>
+                    <div><span style="color:#999">Время:</span> ${s.start_time} — ${s.end_time}</div>
+                    <div><span style="color:#999">Слот:</span> ${s.slot_duration_minutes} мин</div>
+                    ${s.break_start ? `<div><span style="color:#999">Перерыв:</span> ${s.break_start} — ${s.break_end}</div>` : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+async function addSchedule() {
+    const days = [...document.querySelectorAll('#modal-add-schedule input[type=checkbox]:checked')].map(c => c.value);
+    if (!days.length) { alert('Выберите рабочие дни'); return; }
+    const data = {
+        name: document.getElementById('sch-name').value || 'Основное расписание',
+        work_days: days,
+        start_time: document.getElementById('sch-start').value,
+        end_time: document.getElementById('sch-end').value,
+        slot_duration_minutes: parseInt(document.getElementById('sch-slot').value) || 60,
+        break_start: document.getElementById('sch-break-start').value || null,
+        break_end: document.getElementById('sch-break-end').value || null,
+    };
+    try {
+        await api('POST', '/schedule', data);
+        closeModal('modal-add-schedule');
+        loadSchedules();
+    } catch(e) { alert(e.message); }
+}
+
+async function activateSchedule(id) {
+    try {
+        await api('PATCH', `/schedule/${id}/activate`);
+        loadSchedules();
+    } catch(e) { alert(e.message); }
+}
+
+async function deleteSchedule(id) {
+    if (!confirm('Удалить расписание?')) return;
+    try {
+        await api('DELETE', `/schedule/${id}`);
+        loadSchedules();
+    } catch(e) { alert(e.message); }
+}
+
+function openException(scheduleId) {
+    document.getElementById('exc-schedule-id').value = scheduleId;
+    openModal('modal-exception');
+}
+
+async function addException() {
+    const scheduleId = document.getElementById('exc-schedule-id').value;
+    const data = {
+        date: document.getElementById('exc-date').value,
+        reason: document.getElementById('exc-reason').value || null,
+    };
+    if (!data.date) { alert('Укажите дату'); return; }
+    try {
+        await api('POST', `/schedule/${scheduleId}/exceptions`, data);
+        closeModal('modal-exception');
+    } catch(e) { alert(e.message); }
+}
+
+loadSchedules();
+</script>
+</body>
+</html>

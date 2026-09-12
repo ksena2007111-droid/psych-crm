@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Бронирования — CRM Психолога</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">🧠 PsychCRM</div>
+        <nav>
+            <div class="nav-group-title">Клиенты</div>
+            <a href="/clients" class="nav-link">👥 Клиенты</a>
+            <a href="/calendar" class="nav-link">📅 Календарь</a>
+            <a href="/bookings" class="nav-link active">📋 Бронирования</a>
+            <div class="nav-group-title">Настройки</div>
+            <a href="/services" class="nav-link">💼 Услуги</a>
+            <a href="/schedule" class="nav-link">🕐 Расписание</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link logout">🚪 Выйти</a>
+        </div>
+    </aside>
+    <main class="content">
+        <div class="page-header">
+            <h1>Бронирования</h1>
+        </div>
+
+        <div class="search-bar">
+            <select id="filter-status" onchange="loadBookings()">
+                <option value="">Все статусы</option>
+                <option value="pending">Ожидает</option>
+                <option value="confirmed">Подтверждено</option>
+                <option value="cancelled">Отменено</option>
+            </select>
+            <select id="filter-paid" onchange="renderFiltered()">
+                <option value="">Любая оплата</option>
+                <option value="paid">Оплачено</option>
+                <option value="unpaid">Не оплачено</option>
+            </select>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Клиент</th>
+                        <th>Дата / Время</th>
+                        <th>Услуга</th>
+                        <th>Стоимость</th>
+                        <th>Статус</th>
+                        <th>Оплата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="bookings-list">
+                    <tr><td colspan="7" style="text-align:center;color:#999">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+let allBookings = [];
+let clientMap = {};
+let serviceMap = {};
+
+async function loadBookings() {
+    try {
+        const status = document.getElementById('filter-status').value;
+        const url = status ? `/bookings?status=${status}` : '/bookings';
+        const [bookings, clients, services] = await Promise.all([
+            api('GET', url),
+            api('GET', '/clients'),
+            api('GET', '/services'),
+        ]);
+        allBookings = bookings;
+        clients.forEach(c => clientMap[c.id] = c);
+        services.forEach(s => serviceMap[s.id] = s);
+        renderFiltered();
+    } catch(e) { console.error(e); }
+}
+
+function renderFiltered() {
+    const paidFilter = document.getElementById('filter-paid').value;
+    let list = allBookings;
+    if (paidFilter === 'paid') list = list.filter(b => b.is_paid);
+    if (paidFilter === 'unpaid') list = list.filter(b => !b.is_paid);
+    renderBookings(list);
+}
+
+function renderBookings(bookings) {
+    const tbody = document.getElementById('bookings-list');
+    if (!bookings.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">Нет бронирований</td></tr>';
+        return;
+    }
+    tbody.innerHTML = bookings.map(b => {
+        const client = clientMap[b.client_id];
+        const service = serviceMap[b.service_id];
+        return `
+        <tr>
+            <td><strong>${client ? client.name : '—'}</strong></td>
+            <td>${b.date} ${b.time}</td>
+            <td>${service ? service.name : '—'}</td>
+            <td>${service ? service.price + ' BYN' : '—'}</td>
+            <td>${statusBadge(b.status)}</td>
+            <td>
+                <span class="badge ${b.is_paid ? 'badge-confirmed' : 'badge-pending'}">
+                    ${b.is_paid ? '✅ Оплачено' : '⏳ Не оплачено'}
+                </span>
+            </td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap">
+                ${b.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="confirmBooking(${b.id})">✓</button>` : ''}
+                ${b.status !== 'cancelled' ? `<button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">✗</button>` : ''}
+                <button class="btn btn-sm ${b.is_paid ? 'btn-outline' : 'btn-primary'}" onclick="togglePaid(${b.id}, ${b.is_paid})">
+                    ${b.is_paid ? 'Отменить оплату' : 'Отметить оплату'}
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function confirmBooking(id) {
+    try {
+        await api('PATCH', `/bookings/${id}/confirm`);
+        loadBookings();
+    } catch(e) { alert(e.message); }
+}
+
+async function cancelBooking(id) {
+    if (!confirm('Отменить бронирование?')) return;
+    try {
+        await api('PATCH', `/bookings/${id}/cancel`);
+        loadBookings();
+    } catch(e) { alert(e.message); }
+}
+
+async function togglePaid(id, currentPaid) {
+    try {
+        await api('PATCH', `/bookings/${id}/paid`, { is_paid: !currentPaid });
+        loadBookings();
+    } catch(e) { alert(e.message); }
+}
+
+loadBookings();
+</script>
+</body>
+</html>
