@@ -1,6 +1,6 @@
 import httpx
 
-BASE_URL = "https://твоя-ссылка.up.railway.app/api"
+BASE_URL = "https://psych-crm-production.up.railway.app/api"
 
 async def get_services(psychologist_id: int):
     async with httpx.AsyncClient() as client:
